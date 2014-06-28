@@ -1,0 +1,14 @@
+input.pcd
+700
+700
+0.01f
+400
+0.0
+
+====== Order ======
+cloud Name
+width
+height
+resolution
+f (distance from pinhole)
+theta (rotation)

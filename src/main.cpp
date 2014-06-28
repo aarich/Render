@@ -10,67 +10,68 @@
 #include <ctime>
 #include <cstdlib>
 
-#include "PC_Transformer.h"
+#include "render.h"
 
 using namespace std;
-using namespace Eigen;
 using namespace pcl;
-using namespace PC_Transform;
-// This is the main function
+using namespace Eigen;
+
+#define PT PointXYZRGB
+
 int main (int argc, char** argv)
 {
-	string cloud_name;
-	Vector3f rotate;
-	Vector3f trans;
-
-	ifstream file(argv[1]);
+    string cloud_name;
+    ifstream file(argv[1]);
 
     if ( !file.is_open() )
         return false;
 
     string str;
-    getline( file, str);
+
+    getline( file, str );
     cloud_name = str;
 
-    for(int i = 0; i < 3 && !file.eof(); i++)
-    {
-    	getline( file, str);
-    	trans(i) = atof(str.c_str());
-    }
+    // width
+    getline( file, str );
+    int w = atoi(str.c_str());
+    // height
+    getline( file, str );
+    int h = atoi(str.c_str());
+    // resolution
+    getline( file, str );
+    float r = atof(str.c_str());
+    // f (distance from pinhole)
+    getline( file, str );
+    float f = atof(str.c_str());
+    // theta
+    getline( file, str );
+    float theta = atof(str.c_str());
 
-    for(int i = 0; i < 3 && !file.eof(); i++)
-    {
-    	getline( file, str);
-    	rotate(i) = atof(str.c_str());
-    }
     file.close();
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr source_cloud (new pcl::PointCloud<pcl::PointXYZ> ());
-    pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud (new pcl::PointCloud<pcl::PointXYZ> ());
-    pcl::io::loadPLYFile (cloud_name, *source_cloud) ;
+    PointCloud<PT>::Ptr cloud (new pcl::PointCloud<PT>);
 
-    PC_Roll_Pitch_Yaw_Translate(source_cloud, transformed_cloud, rotate, trans);
+    io::loadPCDFile<PT>(cloud_name, *cloud);
 
-	// Visualization
-	printf("\nPoint cloud colors :	black	= original point cloud\n			red	= transformed point cloud\n");
-	pcl::visualization::PCLVisualizer viewer ("Matrix transformation example");
+    Eigen::Affine3f tf = Eigen::Affine3f::Identity();
 
-	pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> source_cloud_color_handler (source_cloud, 0, 0, 0); // Where 255,255,255 are R,G,B colors
-	viewer.addPointCloud (source_cloud, source_cloud_color_handler, "original_cloud");	// We add the point cloud to the viewer and pass the color handler
+    //tf.translation() << 2.5, 0.0, 0.0;
+    tf.rotate (Eigen::AngleAxisf (theta, Eigen::Vector3f::UnitY()));
+    pcl::transformPointCloud (*cloud, *cloud, tf);
 
-	pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> transformed_cloud_color_handler (transformed_cloud, 230, 20, 20);
-	viewer.addPointCloud (transformed_cloud, transformed_cloud_color_handler, "transformed_cloud");
+    Mat result = render::makeImagefromSize(cloud, w, h, r, f);
 
-	viewer.addCoordinateSystem (1.0, 0);
-	viewer.setBackgroundColor(0.95, 0.95, 0.95, 0); // Setting background to a dark grey
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "original_cloud");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "transformed_cloud");
-	viewer.setPosition(800, 400); // Setting visualiser window position
+    imwrite("img.jpg", result);
 
-	while (!viewer.wasStopped ()) { // Display the visualiser untill 'q' key is pressed
-		viewer.spinOnce ();
-	}
+    namedWindow("Render");
+    imshow("Render", result);
+    waitKey();
 
-	return 0;
+    visualization::PCLVisualizer v;
+
+    v.addPointCloud(cloud, "cloud");
+    v.spin();
+
+    return 0;
 }
 
